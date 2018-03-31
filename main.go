@@ -13,12 +13,15 @@ import (
 	"strconv"
 )
 
+const ConfigName = "config.ini"
+
 var db *sql.DB
 
 func main() {
 	dbc := getDatabaseConfig()
-	if dbc == nil {
-		fmt.Println("Generated default config at config.ini. Please fill correct values.")
+	if dbc.load(ConfigName) != nil {
+		dbc.save(ConfigName)
+		fmt.Println("Generated default config at ", ConfigName, ". Please fill correct values.")
 		os.Exit(1)
 	}
 
@@ -31,7 +34,7 @@ func main() {
 
 	err = db.Ping()
 	if err != nil {
-		log.Fatal("Could not connect to the database. Please confirm config.ini is using the correct values.")
+		log.Fatal("Could not connect to the database. Please confirm ", ConfigName, " is using the correct values.")
 	}
 
 	router := mux.NewRouter()
@@ -52,7 +55,7 @@ type DatabaseConfig struct {
 }
 
 func getDatabaseConfig() *DatabaseConfig {
-	co := &DatabaseConfig{
+	return &DatabaseConfig{
 		Hostname: "127.0.0.1",
 		Port:     3306,
 		Protocol: "tcp",
@@ -60,31 +63,29 @@ func getDatabaseConfig() *DatabaseConfig {
 		Username: "REPLACE_ME",
 		Password: "REPLACE_ME",
 	}
-
-	cf, err := ini.Load("config.ini")
-	// File doesn't exist
-	if err != nil {
-		// Create the file with default values
-		createDatabaseConfig(co)
-		return nil
-	} else {
-		// Map existing files from file to object
-		err = cf.MapTo(co)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	return co
 }
 
-func createDatabaseConfig(co *DatabaseConfig) {
-	cf := ini.Empty()
-	err := ini.ReflectFrom(cf, co)
+func (dbc *DatabaseConfig) load(filename string) error {
+	f, err := ini.Load(filename)
+	if err != nil {
+		return err
+	}
+
+	err = f.MapTo(dbc)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dbc *DatabaseConfig) save(filename string) {
+	tmp := ini.Empty()
+	err := ini.ReflectFrom(tmp, dbc)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cf.SaveTo("config.ini")
+	tmp.SaveTo(filename)
 }
 
 type Event struct {
