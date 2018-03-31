@@ -18,13 +18,16 @@ const ConfigName = "config.ini"
 var db *sql.DB
 
 func main() {
+	// Get the database config
 	dbc := getDatabaseConfig()
-	if dbc.load(ConfigName) != nil {
-		dbc.save(ConfigName)
+	// Database config file does not exist
+	if dbc.Load(ConfigName) != nil {
+		dbc.Save(ConfigName)
 		fmt.Println("Generated default config at ", ConfigName, ". Please fill correct values.")
 		os.Exit(1)
 	}
 
+	// Open a connection to the database
 	var err error
 	db, err = sql.Open("mysql", fmt.Sprintf("%s:%s@%s(%s:%d)/%s", dbc.Username, dbc.Password, dbc.Protocol, dbc.Hostname, dbc.Port, dbc.Database))
 	if err != nil {
@@ -32,19 +35,23 @@ func main() {
 	}
 	defer db.Close()
 
+	// Test the database configuration
 	err = db.Ping()
 	if err != nil {
 		log.Fatal("Could not connect to the database. Please confirm ", ConfigName, " is using the correct values.")
 	}
 
+	// Create the routes
 	router := mux.NewRouter()
 	router.HandleFunc("/event", GetEvents).Methods("GET")
 	router.HandleFunc("/event/{id}", GetEvent).Methods("GET")
 
+	// Start the web server
 	fmt.Println("Starting web server on port 8000")
 	log.Fatal(http.ListenAndServe(":8000", router))
 }
 
+// DatabaseConfig is the structure of the database configuration ini file.
 type DatabaseConfig struct {
 	Hostname string `ini:"hostname"`
 	Port     int    `ini:"port"`
@@ -54,6 +61,7 @@ type DatabaseConfig struct {
 	Password string `ini:"password"`
 }
 
+// getDatabaseConfig returns a DatabaseConfig pointer with default configuration.
 func getDatabaseConfig() *DatabaseConfig {
 	return &DatabaseConfig{
 		Hostname: "127.0.0.1",
@@ -65,7 +73,9 @@ func getDatabaseConfig() *DatabaseConfig {
 	}
 }
 
-func (dbc *DatabaseConfig) load(filename string) error {
+// Load opens the file specified by filename as an ini file and loads the
+// configuration into the DatabaseConfig.
+func (dbc *DatabaseConfig) Load(filename string) error {
 	f, err := ini.Load(filename)
 	if err != nil {
 		return err
@@ -79,7 +89,9 @@ func (dbc *DatabaseConfig) load(filename string) error {
 	return nil
 }
 
-func (dbc *DatabaseConfig) save(filename string) {
+// Save writes the current configuration of the DatabaseConfig to an ini file
+// specified by filename.
+func (dbc *DatabaseConfig) Save(filename string) {
 	tmp := ini.Empty()
 	err := ini.ReflectFrom(tmp, dbc)
 	if err != nil {
